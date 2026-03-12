@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, abort
+from flask import Flask, jsonify, request
 from marshmallow import Schema, fields, ValidationError
 
 app = Flask(__name__)
@@ -19,6 +19,7 @@ class StudentSchema(Schema):
 student_schema = StudentSchema()
 students_schema = StudentSchema(many=True)
 
+# Handle validation errors
 @app.errorhandler(ValidationError)
 def handle_validation_error(e):
     return jsonify({"error": e.messages}), 400
@@ -65,6 +66,9 @@ def get_student(student_id):
 @app.route('/students', methods=['POST'])
 def add_student():
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "No input data provided"}), 400
+
     try:
         student_data = student_schema.load(data)
     except ValidationError as err:
@@ -87,9 +91,18 @@ def update_student(student_id):
         return jsonify({"error": "Student not found"}), 404
 
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "No input data provided"}), 400
+
+    # Check if name is being updated to an existing student's name
+    if "name" in data:
+        if any(s['name'].lower() == data["name"].lower() and s['id'] != student_id for s in students):
+            return jsonify({"error": "Another student with this name already exists"}), 400
+
     for key in ["name", "grade", "section"]:
         if key in data:
             student[key] = data[key]
+
     return jsonify(student_schema.dump(student))
 
 # Delete student
